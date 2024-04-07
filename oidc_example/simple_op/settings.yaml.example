@@ -34,8 +34,8 @@ authn:
               class: provider.authn.util.JSONDictDB
               kwargs:
                   json_path: passwd.json
-          smtp_server: smtp.example.com
-          outgoing_sender: sender@example.com
+          smtp_server: localhost
+          outgoing_sender: sso@localhost
     #- acr: yubikey
     #  class: provider.authn.yubikey.YubicoOTP
     #  kwargs:
@@ -53,8 +53,8 @@ userinfo:
         json_path: users.json
 
 server:
-    cert: certs/localhost.crt
-    key: certs/localhost.key
+    cert: /home/jeremy/.acme.sh/jeremylowery.me_ecc/fullchain.cer
+    key: /home/jeremy/.acme.sh/jeremylowery.me_ecc/jeremylowery.me.key
     cert_chain:
     template_dirs:
         - src/provider/authn/templates

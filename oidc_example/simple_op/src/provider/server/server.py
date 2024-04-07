@@ -7,11 +7,12 @@ import os
 from functools import partial
 from functools import wraps
 from urllib import parse as urlparse
+import logging
 
 import cherrypy
 import yaml
-from cherrypy import wsgiserver
-from cherrypy.wsgiserver.ssl_builtin import BuiltinSSLAdapter
+
+
 from jinja2 import select_autoescape
 from jinja2.environment import Environment
 from jinja2.loaders import FileSystemLoader
@@ -30,6 +31,7 @@ from oic.utils.authz import AuthzHandling
 from oic.utils.http_util import BadRequest
 from oic.utils.http_util import NotFound
 from oic.utils.http_util import Response
+from oic.utils import shelve_wrapper
 from oic.utils.http_util import SeeOther
 from oic.utils.http_util import get_or_post
 from oic.utils.http_util import get_post
@@ -42,11 +44,26 @@ from oic.utils.webfinger import WebFinger
 try:
     from cherrypy.wsgiserver.wsgiserver3 import WSGIPathInfoDispatcher
 except ImportError:
-    from cherrypy.wsgiserver.wsgiserver2 import WSGIPathInfoDispatcher
+    try:
+        from cherrypy.wsgiserver.wsgiserver2 import WSGIPathInfoDispatcher
+    except ImportError:
+        from cheroot.wsgi import WSGIPathInfoDispatcher
 
+try:
+    from cheroot.wsgi import Server as WSGIServer
+except ImportError:
+    from cherrypy.wsgiserver import CherryPyWSGIServer as WSGIServer
+try:
+    from cherrypy.wsgiserver.ssl_builtin import BuiltinSSLAdapter
+except ImportError:
+    from cheroot.ssl.builtin import BuiltinSSLAdapter
+try:
+    from wsgiserver import CherryPyWSGIServer as WSGIServer
+except ImportError:
+    from cheroot.wsgi import WSGIServer
 
-
-
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger()
 def VerifierMiddleware(verifier):
     """Common wrapper for the authentication modules.
         * Parses the request before passing it on to the authentication module.
@@ -201,7 +218,9 @@ def main():
     i = cls(**userinfo_conf["kwargs"])
     userinfo = UserInfo(i)
 
-    client_db = {}
+#    client_db = {}
+    client_db = shelve_wrapper.open("client_db")
+    logger.info("Known client_ids: {}".format([k for k in client_db.keys()]))
     session_db = create_session_db(issuer,
                                    secret=rndstr(32), password=rndstr(32))
     provider = Provider(issuer, session_db, client_db, authn_broker,
@@ -235,7 +254,7 @@ def main():
     routing = dict(list(auth_routing.items()) + list(app_routing.items()))
     routing["/static"] = make_static_handler(path)
     dispatcher = WSGIPathInfoDispatcher(routing)
-    server = wsgiserver.CherryPyWSGIServer(('0.0.0.0', args.port), dispatcher)  # nosec
+    server = WSGIServer(('0.0.0.0', args.port), dispatcher)  # nosec
 
     # Setup SSL
     if provider.baseurl.startswith("https://"):
